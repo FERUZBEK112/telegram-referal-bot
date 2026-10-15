@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     bot_token: str = Field(alias="BOT_TOKEN")
-    admin_ids: list[int] = Field(default_factory=list, alias="ADMIN_IDS")
+    admin_ids_raw: str = Field(default="", alias="ADMIN_IDS")
     support_username: str = Field(default="", alias="SUPPORT_USERNAME")
     referral_reward: int = Field(default=250, ge=1, alias="REFERRAL_REWARD")
     min_withdrawal: int = Field(default=5000, ge=1, alias="MIN_WITHDRAWAL")
@@ -16,14 +16,13 @@ class Settings(BaseSettings):
         default="sqlite+aiosqlite:///data/bot.db", alias="DATABASE_URL"
     )
 
-    @field_validator("admin_ids", mode="before")
-    @classmethod
-    def parse_admin_ids(cls, value: object) -> list[int]:
-        if value in (None, ""):
-            return []
-        if isinstance(value, str):
-            return [int(item.strip()) for item in value.split(",") if item.strip()]
-        return value  # type: ignore[return-value]
+    @property
+    def admin_ids(self) -> list[int]:
+        return [
+            int(item.strip())
+            for item in self.admin_ids_raw.split(",")
+            if item.strip()
+        ]
 
     @field_validator("support_username", mode="before")
     @classmethod
