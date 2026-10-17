@@ -78,7 +78,7 @@ bot.command("deladmin",async ctx=>{if(!await isAdmin(ctx.from.id))return;const i
 bot.action(/^o_(accepted|cancelled)_(\d+)$/,async ctx=>{if(!await isAdmin(ctx.from.id))return ctx.answerCbQuery("Ruxsat yo‘q");const q=await pool.query("UPDATE orders SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *",[ctx.match[1],ctx.match[2]]);if(q.rowCount)await bot.telegram.sendMessage(String(q.rows[0].telegram_id),`📦 Buyurtma #${q.rows[0].id}: ${ctx.match[1]}`);await ctx.editMessageReplyMarkup(undefined);ctx.answerCbQuery("Yangilandi")});
 
 app.use(bot.webhookCallback("/telegram/webhook",{secretToken:WEBHOOK_SECRET}));
-app.get("/health",(_q,res)=>res.json({ok:true}));
+app.all("/health",(_q,res)=>res.json({ok:true}));
 app.get("/api/config",(_q,res)=>res.json({support:SUPPORT,cardNumber:CARD_NUMBER,cardHolder:CARD_HOLDER,referralReward:REF_REWARD,prices:PRICES}));
 app.get("/api/me",auth,async(req,res)=>{const [u,r,a]=await Promise.all([pool.query("SELECT telegram_id,first_name,username,language,theme,balance FROM users WHERE telegram_id=$1",[req.tg.id]),pool.query("SELECT COUNT(*)::int count,COALESCE(SUM(reward),0) total FROM referrals WHERE referrer_id=$1",[req.tg.id]),isAdmin(req.tg.id)]);res.json({...u.rows[0],referrals:r.rows[0],isAdmin:a,botUsername:bot.botInfo?.username||""})});
 app.patch("/api/settings",auth,async(req,res)=>{const l=["uz","ru","en"].includes(req.body.language)?req.body.language:null,t=["light","dark","system"].includes(req.body.theme)?req.body.theme:null;if(!l&&!t)return res.status(400).json({error:"Invalid setting"});await pool.query("UPDATE users SET language=COALESCE($1,language),theme=COALESCE($2,theme) WHERE telegram_id=$3",[l,t,req.tg.id]);res.json({ok:true})});
