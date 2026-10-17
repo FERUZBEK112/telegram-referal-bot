@@ -1,31 +1,24 @@
-# Telegram Referal Bot
+# NOVA Stars Market
 
-O‘zbek tilidagi Telegram referral bot. Har bir yangi taklif qilingan foydalanuvchi uchun taklif qiluvchiga 250 so‘m (yoki `REFERRAL_REWARD`) yoziladi.
+Telegram Mini App + bot for Stars, Premium, Gifts and NFT Gift orders.
 
-## Imkoniyatlar
+## Features
+- Uzbek, Russian and English UI
+- Light, dark and system themes
+- Secure Telegram initData validation
+- Referral balance (+0.5 internal Stars by default)
+- Server-side pricing
+- Card-payment order flow
+- Admin order dashboard and Telegram alerts
+- Admin management
+- PostgreSQL persistence
+- Railway-ready healthcheck
 
-- `/start` va shaxsiy referral havola
-- Bir foydalanuvchi uchun faqat bir marta bonus
-- O‘zini o‘zi taklif qilishdan himoya
-- Kabinet: balans va referallar soni
-- Karta orqali pul yechish so‘rovi
-- Admin uchun tasdiqlash/rad etish tugmalari
-- SQLite va PostgreSQL qo‘llab-quvvatlanadi
+## Commands
+- /start, /app, /support
+- /admin
+- /addadmin TELEGRAM_ID
+- /deladmin TELEGRAM_ID
 
-## Ishga tushirish
-
-1. `.env.example` faylidan `.env` yarating.
-2. `BOT_TOKEN` va `ADMIN_IDS` qiymatlarini kiriting.
-3. `pip install -r requirements.txt` buyrug‘ini bajaring.
-4. `python -m app.main` bilan ishga tushiring.
-
-## Railway o‘zgaruvchilari
-
-- `BOT_TOKEN` — BotFather bergan token (majburiy)
-- `ADMIN_IDS` — vergul bilan ajratilgan Telegram raqamli ID lar
-- `DATABASE_URL` — PostgreSQL ulanish manzili yoki SQLite URL
-- `REFERRAL_REWARD` — standart `250`
-- `MIN_WITHDRAWAL` — standart `5000`
-- `SUPPORT_USERNAME` — `@` belgisiz username
-
-Maxfiy tokenni GitHub’ga joylamang.
+## Important
+Never commit BOT_TOKEN. Configure all values from .env.example as Railway Variables.
