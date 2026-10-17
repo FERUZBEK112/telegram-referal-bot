@@ -20,6 +20,7 @@ const PRICES={star:Number(env.STAR_PRICE_UZS||220),premium3:Number(env.PREMIUM_3
 const ROOT_ADMINS=(env.ADMIN_IDS||"7538161787").split(",").map(Number).filter(Boolean);
 const pool=new pg.Pool({connectionString:env.DATABASE_URL,ssl:env.PGSSL==="true"?{rejectUnauthorized:false}:undefined});
 const bot=new Telegraf(BOT_TOKEN);
+const WEBHOOK_SECRET=crypto.createHash("sha256").update(BOT_TOKEN).digest("hex");
 const app=express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 app.use(helmet({contentSecurityPolicy:false,crossOriginEmbedderPolicy:false}));
@@ -76,6 +77,7 @@ bot.command("addadmin",async ctx=>{if(!await isAdmin(ctx.from.id))return;const i
 bot.command("deladmin",async ctx=>{if(!await isAdmin(ctx.from.id))return;const id=Number(ctx.message.text.split(/\s+/)[1]);if(!id||ROOT_ADMINS.includes(id))return ctx.reply("ID noto‘g‘ri yoki asosiy admin.");await pool.query("DELETE FROM admins WHERE telegram_id=$1",[id]);ctx.reply("✅ Admin o‘chirildi: "+id)});
 bot.action(/^o_(accepted|cancelled)_(\d+)$/,async ctx=>{if(!await isAdmin(ctx.from.id))return ctx.answerCbQuery("Ruxsat yo‘q");const q=await pool.query("UPDATE orders SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *",[ctx.match[1],ctx.match[2]]);if(q.rowCount)await bot.telegram.sendMessage(String(q.rows[0].telegram_id),`📦 Buyurtma #${q.rows[0].id}: ${ctx.match[1]}`);await ctx.editMessageReplyMarkup(undefined);ctx.answerCbQuery("Yangilandi")});
 
+app.use(bot.webhookCallback("/telegram/webhook",{secretToken:WEBHOOK_SECRET}));
 app.get("/health",(_q,res)=>res.json({ok:true}));
 app.get("/api/config",(_q,res)=>res.json({support:SUPPORT,cardNumber:CARD_NUMBER,cardHolder:CARD_HOLDER,referralReward:REF_REWARD,prices:PRICES}));
 app.get("/api/me",auth,async(req,res)=>{const [u,r,a]=await Promise.all([pool.query("SELECT telegram_id,first_name,username,language,theme,balance FROM users WHERE telegram_id=$1",[req.tg.id]),pool.query("SELECT COUNT(*)::int count,COALESCE(SUM(reward),0) total FROM referrals WHERE referrer_id=$1",[req.tg.id]),isAdmin(req.tg.id)]);res.json({...u.rows[0],referrals:r.rows[0],isAdmin:a,botUsername:bot.botInfo?.username||""})});
@@ -100,6 +102,6 @@ app.delete("/api/admin/admins/:id",auth,adminOnly,async(req,res)=>{const id=Numb
 app.get("*",(_q,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
 app.use((e,_q,res,_n)=>{console.error(e);res.status(500).json({error:"Server xatosi"})});
 
-async function main(){await dbInit();bot.botInfo=await bot.telegram.getMe();if(PUBLIC_URL){await bot.telegram.setChatMenuButton({menuButton:{type:"web_app",text:"Market",web_app:{url:PUBLIC_URL}}});await bot.telegram.setMyCommands([{command:"start",description:"Botni ishga tushirish"},{command:"app",description:"Marketni ochish"},{command:"support",description:"Support"}])}app.listen(Number(env.PORT||3000),"0.0.0.0",()=>console.log("Server ready"));await bot.launch()}
+async function main(){await dbInit();bot.botInfo=await bot.telegram.getMe();if(PUBLIC_URL){await bot.telegram.setChatMenuButton({menuButton:{type:"web_app",text:"Market",web_app:{url:PUBLIC_URL}}});await bot.telegram.setMyCommands([{command:"start",description:"Botni ishga tushirish"},{command:"app",description:"Marketni ochish"},{command:"support",description:"Support"}])}app.listen(Number(env.PORT||3000),"0.0.0.0",()=>console.log("Server ready"));if(PUBLIC_URL){await bot.telegram.setWebhook(PUBLIC_URL+"/telegram/webhook",{secret_token:WEBHOOK_SECRET});console.log("Telegram webhook ready")}else{await bot.launch()}}
 main().catch(e=>{console.error(e);process.exit(1)});
 process.once("SIGINT",()=>bot.stop("SIGINT"));process.once("SIGTERM",()=>bot.stop("SIGTERM"));
