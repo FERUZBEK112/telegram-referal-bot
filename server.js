@@ -24,7 +24,7 @@ const app=express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 app.use(helmet({contentSecurityPolicy:false,crossOriginEmbedderPolicy:false}));
 app.use(express.json({limit:"200kb"}));
-app.use(express.static(path.join(__dirname,"public"),{maxAge:env.NODE_ENV==="production"?"1h":0}));
+app.use(express.static(path.join(__dirname,"public"),{maxAge:0,etag:true}));
 
 async function dbInit(){
  await pool.query(`
