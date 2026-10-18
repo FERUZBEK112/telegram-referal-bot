@@ -25,7 +25,7 @@ const app=express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 app.use(helmet({contentSecurityPolicy:false,crossOriginEmbedderPolicy:false}));
 app.use(express.json({limit:"200kb"}));
-app.use(express.static(path.join(__dirname,"public"),{maxAge:0,etag:true}));
+app.use(express.static(path.join(__dirname,"public"),{maxAge:0,etag:false,setHeaders(res){res.set("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");res.set("Pragma","no-cache");res.set("Expires","0")}}));
 
 async function dbInit(){
  await pool.query(`
@@ -79,7 +79,7 @@ bot.action(/^o_(accepted|cancelled)_(\d+)$/,async ctx=>{if(!await isAdmin(ctx.fr
 
 app.use(bot.webhookCallback("/telegram/webhook",{secretToken:WEBHOOK_SECRET}));
 app.all("/health",(_q,res)=>res.json({ok:true}));
-app.get("/api/config",(_q,res)=>res.json({support:SUPPORT,cardNumber:CARD_NUMBER,cardHolder:CARD_HOLDER,referralReward:REF_REWARD,prices:PRICES}));
+app.get("/api/config",(_q,res)=>{res.set("Cache-Control","no-store");res.json({support:SUPPORT,botUsername:bot.botInfo?.username||"",cardNumber:CARD_NUMBER,cardHolder:CARD_HOLDER,referralReward:REF_REWARD,prices:PRICES})});
 app.get("/api/me",auth,async(req,res)=>{const [u,r,a]=await Promise.all([pool.query("SELECT telegram_id,first_name,username,language,theme,balance FROM users WHERE telegram_id=$1",[req.tg.id]),pool.query("SELECT COUNT(*)::int count,COALESCE(SUM(reward),0) total FROM referrals WHERE referrer_id=$1",[req.tg.id]),isAdmin(req.tg.id)]);res.json({...u.rows[0],referrals:r.rows[0],isAdmin:a,botUsername:bot.botInfo?.username||""})});
 app.patch("/api/settings",auth,async(req,res)=>{const l=["uz","ru","en"].includes(req.body.language)?req.body.language:null,t=["light","dark","system"].includes(req.body.theme)?req.body.theme:null;if(!l&&!t)return res.status(400).json({error:"Invalid setting"});await pool.query("UPDATE users SET language=COALESCE($1,language),theme=COALESCE($2,theme) WHERE telegram_id=$3",[l,t,req.tg.id]);res.json({ok:true})});
 app.get("/api/orders",auth,async(req,res)=>res.json((await pool.query("SELECT * FROM orders WHERE telegram_id=$1 ORDER BY created_at DESC LIMIT 50",[req.tg.id])).rows));
@@ -100,7 +100,7 @@ app.patch("/api/admin/orders/:id",auth,adminOnly,async(req,res)=>{const s=["new"
 app.get("/api/admin/admins",auth,adminOnly,async(_q,res)=>res.json((await pool.query("SELECT * FROM admins ORDER BY created_at")).rows));
 app.post("/api/admin/admins",auth,adminOnly,async(req,res)=>{const id=Number(req.body.telegramId);if(!id)return res.status(400).json({error:"Invalid ID"});await pool.query("INSERT INTO admins(telegram_id,added_by) VALUES($1,$2) ON CONFLICT DO NOTHING",[id,req.tg.id]);res.json({ok:true})});
 app.delete("/api/admin/admins/:id",auth,adminOnly,async(req,res)=>{const id=Number(req.params.id);if(ROOT_ADMINS.includes(id))return res.status(400).json({error:"Root admin"});await pool.query("DELETE FROM admins WHERE telegram_id=$1",[id]);res.json({ok:true})});
-app.get("*",(_q,res)=>res.sendFile(path.join(__dirname,"public","index.html")));
+app.get("*",(_q,res)=>{res.set("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");res.sendFile(path.join(__dirname,"public","index.html"),{etag:false})});
 app.use((e,_q,res,_n)=>{console.error(e);res.status(500).json({error:"Server xatosi"})});
 
 async function main(){await dbInit();bot.botInfo=await bot.telegram.getMe();if(PUBLIC_URL){await bot.telegram.setChatMenuButton({menuButton:{type:"web_app",text:"Market",web_app:{url:PUBLIC_URL}}});await bot.telegram.setMyCommands([{command:"start",description:"Botni ishga tushirish"},{command:"app",description:"Marketni ochish"},{command:"support",description:"Support"}])}app.listen(Number(env.PORT||3000),"0.0.0.0",()=>console.log("Server ready"));if(PUBLIC_URL){await bot.telegram.setWebhook(PUBLIC_URL+"/telegram/webhook",{secret_token:WEBHOOK_SECRET});console.log("Telegram webhook ready")}else{await bot.launch()}}
