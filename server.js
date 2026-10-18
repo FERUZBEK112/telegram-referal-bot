@@ -67,7 +67,7 @@ async function isAdmin(id){return (await pool.query("SELECT 1 FROM admins WHERE 
 async function adminOnly(req,res,next){if(await isAdmin(req.tg.id))return next();res.status(403).json({error:"Admin access required"})}
 async function tellAdmins(text,extra){const {rows}=await pool.query("SELECT telegram_id FROM admins");await Promise.allSettled(rows.map(x=>bot.telegram.sendMessage(String(x.telegram_id),text,extra)))}
 function appButtons(){return Markup.inlineKeyboard([[Markup.button.webApp("🚀 Marketni ochish",PUBLIC_URL||"https://t.me")],[Markup.button.url("💬 Support","https://t.me/"+SUPPORT)]])}
-function priceFor(type,quantity,plan,item){if(type==="stars")return Math.round(quantity*PRICES.star);if(type==="premium"&&["3","6","12"].includes(plan))return PRICES["premium"+plan];if(type==="gift"&&["bear","rose","rocket","diamond"].includes(item))return PRICES["gift"+item[0].toUpperCase()+item.slice(1)];if(type==="nft")return PRICES.nftBase;return 0}
+function priceFor(type,quantity,plan,item){if(type==="stars")return Math.round(quantity*PRICES.star);if(type==="premium"&&["3","6","12"].includes(plan))return PRICES["premium"+plan];if(type==="gift"&&["bear","rose","rocket","diamond"].includes(item))return PRICES["gift"+item[0].toUpperCase()+item.slice(1)];if(type==="nft")return PRICES.nftBase;if(type==="topup")return Math.round(quantity);return 0}
 
 bot.start(async ctx=>{const p=ctx.startPayload||"",ref=p.startsWith("ref_")?Number(p.slice(4)):null;await saveUser(ctx.from,ref);await ctx.reply(`Salom, ${ctx.from.first_name}! ✨\n\nStars, Telegram Premium va Gifts — tez va ishonchli market. Pastdagi tugma orqali kiring.`,appButtons())});
 bot.command("app",ctx=>ctx.reply("Market tayyor 👇",appButtons()));
@@ -85,9 +85,10 @@ app.patch("/api/settings",auth,async(req,res)=>{const l=["uz","ru","en"].include
 app.get("/api/orders",auth,async(req,res)=>res.json((await pool.query("SELECT * FROM orders WHERE telegram_id=$1 ORDER BY created_at DESC LIMIT 50",[req.tg.id])).rows));
 app.post("/api/orders",auth,async(req,res)=>{
  const type=String(req.body.type||""),quantity=Number(req.body.quantity||1),plan=String(req.body.plan||""),item=String(req.body.item||""),recipient=String(req.body.recipient||"").trim().slice(0,100),note=String(req.body.note||"").trim().slice(0,500);
- if(!["stars","premium","gift","nft"].includes(type)||!recipient||!Number.isFinite(quantity)||quantity<=0||quantity>100000)return res.status(400).json({error:"Ma’lumotlar noto‘g‘ri"});
+ const validQuantity=type==="topup"?quantity>=1000&&quantity<=100000000:quantity>0&&quantity<=100000;
+ if(!["stars","premium","gift","nft","topup"].includes(type)||!recipient||!Number.isFinite(quantity)||!validQuantity)return res.status(400).json({error:"Ma’lumotlar noto‘g‘ri"});
  const price=priceFor(type,quantity,plan,item);if(!price)return res.status(400).json({error:"Noto‘g‘ri mahsulot"});
- const giftNames={bear:"Mishka Gift",rose:"Atirgul Gift",rocket:"Raketa Gift",diamond:"Olmos Gift"};const name=type==="stars"?quantity+" Telegram Stars":type==="premium"?"Telegram Premium "+plan+" oy":type==="nft"?"NFT/NFC Gift buyurtmasi":giftNames[item];
+ const giftNames={bear:"Mishka Gift",rose:"Atirgul Gift",rocket:"Raketa Gift",diamond:"Olmos Gift"};const name=type==="stars"?quantity+" Telegram Stars":type==="premium"?"Telegram Premium "+plan+" oy":type==="nft"?"NFT/NFC Gift buyurtmasi":type==="topup"?"Balansni "+Number(quantity).toLocaleString()+" UZS ga to‘ldirish":giftNames[item];
  const q=await pool.query("INSERT INTO orders(telegram_id,product_type,product_name,quantity,price,recipient,note) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",[req.tg.id,type,name,quantity,price,recipient,note]);
  const o=q.rows[0],un=req.tg.username?"@"+req.tg.username:"username yo‘q";
  await tellAdmins(`🔥 YANGI BUYURTMA #${o.id}\n\n👤 ${req.tg.first_name} (${un})\n🆔 ${req.tg.id}\n📦 ${o.product_name}\n💰 ${Number(o.price).toLocaleString()} UZS\n🎯 ${recipient}\n📝 ${note||"—"}`,Markup.inlineKeyboard([[Markup.button.callback("✅ Qabul","o_accepted_"+o.id),Markup.button.callback("❌ Bekor","o_cancelled_"+o.id)]]));
